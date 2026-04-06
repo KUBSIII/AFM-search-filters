@@ -1,5 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,6 +9,11 @@ from sqlalchemy import engine_from_config, pool
 from app.db.models import Base
 
 config = context.config
+
+# Keep Alembic DB target aligned with runtime DB_URL (Docker/local parity).
+db_url_from_env = os.getenv("DB_URL")
+if db_url_from_env:
+    config.set_main_option("sqlalchemy.url", db_url_from_env)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

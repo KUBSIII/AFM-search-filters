@@ -75,11 +75,11 @@ class PlayerRepository:
 
         position = filters.get("position")
         if position:
-            stmt = stmt.where(Player.position == position)
+            stmt = stmt.where(func.lower(Player.position) == str(position).lower())
 
         agent = filters.get("agent_name")
         if agent:
-            stmt = stmt.where(Player.agent_name == agent)
+            stmt = stmt.where(func.lower(Player.agent_name) == str(agent).lower())
 
         birth_date_from = filters.get("birth_date_from")
         if isinstance(birth_date_from, date):
@@ -97,6 +97,22 @@ class PlayerRepository:
         if club_apps_max is not None:
             stmt = stmt.where(Player.club_apps <= int(club_apps_max))
 
+        national_team_apps_min = filters.get("national_team_apps_min")
+        if national_team_apps_min is not None:
+            stmt = stmt.where(Player.national_team_apps >= int(national_team_apps_min))
+
+        national_team_apps_max = filters.get("national_team_apps_max")
+        if national_team_apps_max is not None:
+            stmt = stmt.where(Player.national_team_apps <= int(national_team_apps_max))
+
+        contract_expires_after = filters.get("contract_expires_after")
+        if isinstance(contract_expires_after, date):
+            stmt = stmt.where(Player.contract_expires_at >= contract_expires_after)
+
+        contract_expires_before = filters.get("contract_expires_before")
+        if isinstance(contract_expires_before, date):
+            stmt = stmt.where(Player.contract_expires_at <= contract_expires_before)
+
         return stmt
 
     def _apply_sort(self, stmt: Select[Any], sort: tuple[str, str] | None) -> Select[Any]:
@@ -108,15 +124,16 @@ class PlayerRepository:
             sort_order = sort[1].lower()
 
         allowed_fields = {
+            "last_scraped_at": Player.last_scraped_at,
             "id": Player.id,
             "full_name": Player.full_name,
             "birth_date": Player.birth_date,
             "club_apps": Player.club_apps,
+            "national_team_apps": Player.national_team_apps,
             "contract_expires_at": Player.contract_expires_at,
-            "last_scraped_at": Player.last_scraped_at,
         }
 
-        column = allowed_fields.get(sort_field, Player.id)
+        column = allowed_fields.get(sort_field, Player.last_scraped_at)
         order_expr = column.desc() if sort_order == "desc" else column.asc()
 
         if column is Player.id:

@@ -1,146 +1,136 @@
-﻿# AFM Search Filters
+# AFM Search Filters
 
 Internal FastAPI service for building a local read model of Transfermarkt players.
 
-## Scope (M0-M3)
+## Scope (M0-M4)
 
 - FastAPI bootstrap with health endpoint
 - SQLite persistence layer with SQLAlchemy 2.0
 - Alembic migrations for `players` table
-- Player repository contract (`upsert`, `get`, `list`, `count`)
-- Transfermarkt scraping layer (profile + club roster IDs)
-- Player normalizer (`ok` / `partial` / `error` metadata)
-- Sync API endpoints secured with `X-API-Key`
-- Test suite for health, migrations, repository, scraper, service and sync API
+- Scraper + normalizer pipeline for Transfermarkt data
+- Sync API (`POST /players/sync*`, `POST /clubs/{club_id}/players/sync`) secured with `X-API-Key`
+- Query API (`GET /players`) with filters, sorting and pagination
 
-## Requirements
+## Quick Start (Docker - Recommended)
 
-- Python 3.11+
-- Poetry 1.8+
-
-## Quick Start (PowerShell)
-
-1. Create environment file:
+1. Create env file:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-2. Install dependencies:
+2. Build and run:
 
 ```powershell
-poetry install
+docker compose up --build
 ```
 
-3. Run migrations:
+3. Open:
+
+- `http://127.0.0.1:8001/docs`
+- `http://127.0.0.1:8001/health`
+- `http://127.0.0.1:8001/players`
+
+Notes:
+
+- Migrations run automatically on container start (`alembic upgrade head`).
+- SQLite DB is persisted in Docker volume `afm_data` under `/app/data/afm_search.db`.
+
+### Docker Useful Commands
 
 ```powershell
-poetry run alembic upgrade head
+# Stop
+docker compose down
+
+# Stop + remove volume (hard reset DB)
+docker compose down -v
+
+# Rebuild image
+docker compose build --no-cache
 ```
 
-4. Start API:
+## Quick Start (Poetry - Local Fallback)
+
+If you don't want Docker:
 
 ```powershell
-poetry run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+Copy-Item .env.example .env
+py -m poetry install
+py -m poetry run alembic upgrade head
+py -m poetry run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-5. Verify health endpoint:
+## Query API
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-```
+`GET /players` is read-only and does not require auth.
 
-Expected response:
+Supported params:
+
+- `name`
+- `birth_date_from`, `birth_date_to`
+- `club_apps_min`, `club_apps_max`
+- `national_team_apps_min`, `national_team_apps_max`
+- `position` (exact, case-insensitive)
+- `contract_expires_before`, `contract_expires_after`
+- `agent` (exact, case-insensitive)
+- `limit` (`1..200`, default `50`)
+- `offset` (`>=0`, default `0`)
+- `sort_by` (`last_scraped_at`, `id`, `full_name`, `birth_date`, `club_apps`, `national_team_apps`, `contract_expires_at`)
+- `sort_order` (`asc`, `desc`, default `desc`)
+
+Response shape:
 
 ```json
-{"status":"ok"}
+{
+  "items": [],
+  "total": 0,
+  "limit": 50,
+  "offset": 0
+}
 ```
 
 ## Sync API
 
-All mutating sync endpoints require header `X-API-Key`.
+All mutating sync endpoints require `X-API-Key` header.
 
 - `POST /players/sync/{transfermarkt_id}`
 - `POST /players/sync`
 - `POST /clubs/{club_id}/players/sync`
 
-Example batch request:
+Example:
 
 ```powershell
 $headers = @{"X-API-Key"="change-me"}
 $body = @{ transfermarkt_ids = @("1001", "1002") } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/players/sync -Headers $headers -Body $body -ContentType "application/json"
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8001/players/sync -Headers $headers -Body $body -ContentType "application/json"
 ```
 
 ## Environment Variables
 
-- `APP_ENV` - application environment label (default: `development`)
-- `APP_HOST` - host for local server (default: `127.0.0.1`)
-- `APP_PORT` - port for local server (default: `8000`)
-- `DB_URL` - SQLAlchemy DB URL (default: `sqlite+pysqlite:///./afm_search.db`)
-- `LOG_LEVEL` - logging level (default: `INFO`)
-- `SYNC_API_KEY` - required API key for sync endpoints
-- `TM_HTTP_TIMEOUT_S` - timeout for outbound Transfermarkt requests
-- `TM_MAX_RETRIES` - retry count for 429/5xx and transport errors
-- `TM_BACKOFF_BASE_S` - exponential backoff base in seconds
-- `TM_RATE_LIMIT_RPS` - request rate limit per second
+- `APP_ENV` - environment name
+- `APP_HOST` - host (for local run)
+- `APP_PORT` - port (for local run)
+- `DB_URL` - SQLAlchemy DB URL
+- `LOG_LEVEL` - logging level
+- `SYNC_API_KEY` - API key for sync endpoints
+- `TM_HTTP_TIMEOUT_S` - outbound request timeout
+- `TM_MAX_RETRIES` - retry count for 429/5xx/transport errors
+- `TM_BACKOFF_BASE_S` - retry backoff base seconds
+- `TM_RATE_LIMIT_RPS` - outbound request rate limit
 - `SYNC_MAX_BATCH` - max IDs in `POST /players/sync`
-- `SYNC_MAX_CLUB_PLAYERS` - max roster size accepted in club sync
-
-## Database Operations (PowerShell)
-
-Initialize DB schema:
-
-```powershell
-poetry run alembic upgrade head
-```
-
-Show migration history:
-
-```powershell
-poetry run alembic history
-```
-
-Reset local DB (destructive):
-
-```powershell
-Remove-Item .\afm_search.db -ErrorAction SilentlyContinue
-poetry run alembic upgrade head
-```
+- `SYNC_MAX_CLUB_PLAYERS` - max roster size in club sync
 
 ## Tests
 
-Run all tests:
-
 ```powershell
-poetry run pytest
+py -m poetry run pytest
 ```
 
 ## Local Operational Checklist
 
-- [ ] `.env` created from `.env.example`
-- [ ] dependencies installed with Poetry
-- [ ] migration applied (`alembic upgrade head`)
+- [ ] `.env` exists
+- [ ] app starts (`docker compose up --build` or local Poetry run)
 - [ ] `/health` returns 200
-- [ ] sync endpoints respond with `X-API-Key`
-- [ ] tests are green (`pytest`)
-
-## SQLite Backup (PowerShell)
-
-Create backup:
-
-```powershell
-New-Item -ItemType Directory -Path .\backups -Force | Out-Null
-Copy-Item .\afm_search.db (".\backups\afm_search_{0}.db" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
-```
-
-Restore backup:
-
-```powershell
-Copy-Item .\backups\<backup_name>.db .\afm_search.db
-```
-
-## Next Sprint Entry (M4)
-
-- `GET /players` query API with filters/sort/pagination only from SQLite
-- integration tests for query behavior and deterministic sorting
+- [ ] `/players` returns `items + total + limit + offset`
+- [ ] sync endpoints work with `X-API-Key`
+- [ ] tests are green
