@@ -2,13 +2,16 @@
 
 Internal FastAPI service for building a local read model of Transfermarkt players.
 
-## Scope of v1
+## Scope (M0-M3)
 
 - FastAPI bootstrap with health endpoint
 - SQLite persistence layer with SQLAlchemy 2.0
 - Alembic migrations for `players` table
 - Player repository contract (`upsert`, `get`, `list`, `count`)
-- Test suite for health check, migrations, and repository behavior
+- Transfermarkt scraping layer (profile + club roster IDs)
+- Player normalizer (`ok` / `partial` / `error` metadata)
+- Sync API endpoints secured with `X-API-Key`
+- Test suite for health, migrations, repository, scraper, service and sync API
 
 ## Requirements
 
@@ -53,6 +56,22 @@ Expected response:
 {"status":"ok"}
 ```
 
+## Sync API
+
+All mutating sync endpoints require header `X-API-Key`.
+
+- `POST /players/sync/{transfermarkt_id}`
+- `POST /players/sync`
+- `POST /clubs/{club_id}/players/sync`
+
+Example batch request:
+
+```powershell
+$headers = @{"X-API-Key"="change-me"}
+$body = @{ transfermarkt_ids = @("1001", "1002") } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/players/sync -Headers $headers -Body $body -ContentType "application/json"
+```
+
 ## Environment Variables
 
 - `APP_ENV` - application environment label (default: `development`)
@@ -60,6 +79,13 @@ Expected response:
 - `APP_PORT` - port for local server (default: `8000`)
 - `DB_URL` - SQLAlchemy DB URL (default: `sqlite+pysqlite:///./afm_search.db`)
 - `LOG_LEVEL` - logging level (default: `INFO`)
+- `SYNC_API_KEY` - required API key for sync endpoints
+- `TM_HTTP_TIMEOUT_S` - timeout for outbound Transfermarkt requests
+- `TM_MAX_RETRIES` - retry count for 429/5xx and transport errors
+- `TM_BACKOFF_BASE_S` - exponential backoff base in seconds
+- `TM_RATE_LIMIT_RPS` - request rate limit per second
+- `SYNC_MAX_BATCH` - max IDs in `POST /players/sync`
+- `SYNC_MAX_CLUB_PLAYERS` - max roster size accepted in club sync
 
 ## Database Operations (PowerShell)
 
@@ -96,6 +122,7 @@ poetry run pytest
 - [ ] dependencies installed with Poetry
 - [ ] migration applied (`alembic upgrade head`)
 - [ ] `/health` returns 200
+- [ ] sync endpoints respond with `X-API-Key`
 - [ ] tests are green (`pytest`)
 
 ## SQLite Backup (PowerShell)
@@ -113,8 +140,7 @@ Restore backup:
 Copy-Item .\backups\<backup_name>.db .\afm_search.db
 ```
 
-## Next Sprint Entry (v2)
+## Next Sprint Entry (M4)
 
-- Scraper layer (`player_profile_scraper`, `club_players_scraper`)
-- Normalizer layer for stable DTOs
-- Sync endpoints (`POST /players/sync/{id}`, `POST /clubs/{club_id}/players/sync`)
+- `GET /players` query API with filters/sort/pagination only from SQLite
+- integration tests for query behavior and deterministic sorting

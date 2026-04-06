@@ -34,6 +34,18 @@ class PlayerRepository:
         self.session.flush()
         return player
 
+    def mark_sync_error(self, transfermarkt_id: str, error_message: str) -> Player | None:
+        player = self.get_by_transfermarkt_id(transfermarkt_id)
+        if player is None:
+            return None
+
+        now = datetime.now(timezone.utc)
+        player.sync_status = "error"
+        player.sync_error = error_message
+        player.last_scraped_at = now
+        self.session.flush()
+        return player
+
     def get_by_transfermarkt_id(self, transfermarkt_id: str) -> Player | None:
         stmt = select(Player).where(Player.transfermarkt_id == transfermarkt_id)
         return self.session.scalar(stmt)
