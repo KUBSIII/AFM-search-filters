@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 
 from app.api.routes.sync import get_player_sync_service
 from app.main import app
@@ -37,6 +37,11 @@ class DummyService:
 
     def fetch_club_player_ids(self, club_id: str):
         return self.club_ids
+
+    def fetch_player_ids_by_name(self, name: str, limit: int = 5):
+        if name.lower() == "missing":
+            return []
+        return ["28003", "68290"][:limit]
 
 
 def _auth_headers() -> dict[str, str]:
@@ -83,6 +88,33 @@ def test_sync_batch_respects_limit(client) -> None:
         app.dependency_overrides.clear()
 
     assert response.status_code == 422
+
+
+def test_sync_search_by_name(client) -> None:
+    app.dependency_overrides[get_player_sync_service] = lambda: DummyService()
+    payload = {"name": "Messi", "limit": 2}
+    try:
+        response = client.post("/players/sync/search", json=payload, headers=_auth_headers())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"] == {"processed": 2, "ok": 2, "partial": 0, "error": 0}
+
+
+def test_sync_search_by_name_no_matches_returns_empty_summary(client) -> None:
+    app.dependency_overrides[get_player_sync_service] = lambda: DummyService()
+    payload = {"name": "missing", "limit": 2}
+    try:
+        response = client.post("/players/sync/search", json=payload, headers=_auth_headers())
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"] == {"processed": 0, "ok": 0, "partial": 0, "error": 0}
+    assert body["results"] == []
 
 
 def test_sync_club_respects_limit(client) -> None:

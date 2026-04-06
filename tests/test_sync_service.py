@@ -1,4 +1,3 @@
-﻿from datetime import date
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -29,7 +28,20 @@ class FakeClubScraper:
         return self.ids
 
 
-def _build_service(tmp_path: Path, payloads: dict[str, dict[str, str | None] | Exception], club_ids: list[str]) -> tuple[PlayerSyncService, sessionmaker[Session]]:
+class FakeSearchScraper:
+    def __init__(self, result_ids: list[str]):
+        self.result_ids = result_ids
+
+    def fetch_player_ids_by_name(self, name: str, limit: int = 5) -> list[str]:
+        return self.result_ids[:limit]
+
+
+def _build_service(
+    tmp_path: Path,
+    payloads: dict[str, dict[str, str | None] | Exception],
+    club_ids: list[str],
+    search_ids: list[str] | None = None,
+) -> tuple[PlayerSyncService, sessionmaker[Session]]:
     db_path = tmp_path / "service_sync_test.db"
     engine = create_engine(f"sqlite+pysqlite:///{db_path}", future=True)
     Base.metadata.create_all(engine)
@@ -46,6 +58,7 @@ def _build_service(tmp_path: Path, payloads: dict[str, dict[str, str | None] | E
         session_factory=session_factory,
         profile_scraper=FakeProfileScraper(payloads),
         club_scraper=FakeClubScraper(club_ids),
+        search_scraper=FakeSearchScraper(search_ids or []),
         normalizer=PlayerNormalizer(),
     )
 
@@ -146,3 +159,15 @@ def test_sync_club_returns_ids(tmp_path: Path) -> None:
     )
 
     assert service.fetch_club_player_ids("10") == ["9001", "9002"]
+
+
+def test_sync_search_returns_ids(tmp_path: Path) -> None:
+    service, _ = _build_service(
+        tmp_path,
+        payloads={},
+        club_ids=[],
+        search_ids=["28003", "68290", "342229"],
+    )
+
+    assert service.fetch_player_ids_by_name("Messi", limit=2) == ["28003", "68290"]
+

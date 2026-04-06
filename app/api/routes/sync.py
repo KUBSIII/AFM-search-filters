@@ -1,4 +1,4 @@
-﻿from functools import lru_cache
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -6,10 +6,11 @@ from app.api.dependencies.security import require_sync_api_key
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.normalizers.player_normalizer import PlayerNormalizer
-from app.schemas.sync import BatchSyncRequest, SyncBatchResponse
+from app.schemas.sync import BatchSyncRequest, SearchSyncRequest, SyncBatchResponse
 from app.scrapers.club_players_scraper import ClubPlayersScraper
 from app.scrapers.http_client import TransfermarktHttpClient
 from app.scrapers.player_profile_scraper import PlayerProfileScraper
+from app.scrapers.player_search_scraper import PlayerSearchScraper
 from app.services.player_sync_service import PlayerSyncService
 
 router = APIRouter(tags=["sync"])
@@ -32,6 +33,7 @@ def get_player_sync_service() -> PlayerSyncService:
         session_factory=SessionLocal,
         profile_scraper=PlayerProfileScraper(client),
         club_scraper=ClubPlayersScraper(client),
+        search_scraper=PlayerSearchScraper(client),
         normalizer=PlayerNormalizer(),
     )
 
@@ -55,6 +57,28 @@ def _single_response_dict(result: object) -> dict[str, object]:
             }
         ],
     }
+
+
+@router.post("/players/sync/search", response_model=SyncBatchResponse, dependencies=[Depends(require_sync_api_key)])
+def sync_players_by_name(
+    payload: SearchSyncRequest,
+    service: PlayerSyncService = Depends(get_player_sync_service),
+) -> SyncBatchResponse:
+    try:
+        transfermarkt_ids = service.fetch_player_ids_by_name(payload.name, limit=payload.limit)
+    except Exception as exc:  # noqa: BLE001 - external integration
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if not transfermarkt_ids:
+        return SyncBatchResponse.model_validate(
+            {
+                "summary": {"processed": 0, "ok": 0, "partial": 0, "error": 0},
+                "results": [],
+            }
+        )
+
+    result = service.sync_batch(transfermarkt_ids)
+    return SyncBatchResponse.model_validate(result.to_dict())
 
 
 @router.post("/players/sync/{transfermarkt_id}", response_model=SyncBatchResponse, dependencies=[Depends(require_sync_api_key)])
@@ -99,5 +123,14 @@ def sync_club_players(
             detail=f"Club roster exceeds SYNC_MAX_CLUB_PLAYERS={settings.sync_max_club_players}",
         )
 
+    if not transfermarkt_ids:
+        return SyncBatchResponse.model_validate(
+            {
+                "summary": {"processed": 0, "ok": 0, "partial": 0, "error": 0},
+                "results": [],
+            }
+        )
+
     result = service.sync_batch(transfermarkt_ids)
     return SyncBatchResponse.model_validate(result.to_dict())
+

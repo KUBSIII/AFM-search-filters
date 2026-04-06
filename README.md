@@ -27,6 +27,7 @@ docker compose up --build
 
 3. Open:
 
+- `http://127.0.0.1:8001/ui` (web console for filters + sync)
 - `http://127.0.0.1:8001/docs`
 - `http://127.0.0.1:8001/health`
 - `http://127.0.0.1:8001/players`
@@ -94,6 +95,7 @@ Response shape:
 All mutating sync endpoints require `X-API-Key` header.
 
 - `POST /players/sync/{transfermarkt_id}`
+- `POST /players/sync/search` (sync by player name)
 - `POST /players/sync`
 - `POST /clubs/{club_id}/players/sync`
 
@@ -134,3 +136,7 @@ py -m poetry run pytest
 - [ ] `/players` returns `items + total + limit + offset`
 - [ ] sync endpoints work with `X-API-Key`
 - [ ] tests are green
+
+
+
+

@@ -1,4 +1,4 @@
-﻿PLAYER_NAME_SELECTORS = [
+PLAYER_NAME_SELECTORS = [
     "h1",
     ".data-header__headline",
     "[data-testid='headline']",
@@ -8,21 +8,18 @@
 PROFILE_LABEL_ALIASES = {
     "birth_date": [
         "date of birth",
+        "date of birth/age",
         "born",
         "birth date",
-        "data urodzenia",
     ],
     "position": [
         "position",
         "main position",
-        "pozycja",
     ],
     "contract_expires_at": [
         "contract expires",
         "contract expiration",
         "contract expiry",
-        "kontrakt do",
-        "umowa do",
     ],
     "agent_name": [
         "agent",
@@ -32,18 +29,16 @@ PROFILE_LABEL_ALIASES = {
         "club appearances",
         "appearances (club)",
         "club apps",
-        "występy klubowe",
     ],
     "national_team_apps": [
         "national team appearances",
         "national appearances",
         "caps",
+        "caps/goals",
         "national team apps",
-        "występy reprezentacyjne",
     ],
     "club_name": [
         "current club",
         "club",
-        "aktualny klub",
     ],
 }

@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import json
 from datetime import date, datetime, timezone
 import re
@@ -75,7 +75,12 @@ class PlayerNormalizer:
         if value is None or not value.strip():
             return None
 
-        digits = re.sub(r"[^0-9]", "", value)
+        match = re.search(r"\d[\d\s.,]*", value)
+        if not match:
+            issues.append(f"invalid_int:{field_name}")
+            return None
+
+        digits = re.sub(r"\D", "", match.group(0))
         if not digits:
             issues.append(f"invalid_int:{field_name}")
             return None
@@ -90,6 +95,9 @@ class PlayerNormalizer:
         cleaned = value.strip()
         if not cleaned:
             return None
+
+        # Common Transfermarkt format includes age in parentheses, e.g. 24/06/1987 (38).
+        cleaned = re.sub(r"\([^)]*\)", "", cleaned).strip()
 
         for date_format in (
             "%Y-%m-%d",

@@ -1,4 +1,4 @@
-﻿from enum import Enum
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
@@ -30,3 +30,8 @@ class SyncBatchResponse(BaseModel):
 
 class BatchSyncRequest(BaseModel):
     transfermarkt_ids: list[str] = Field(min_length=1)
+
+
+class SearchSyncRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    limit: int = Field(default=5, ge=1, le=20)

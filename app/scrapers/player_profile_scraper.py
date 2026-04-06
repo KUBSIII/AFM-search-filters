@@ -1,4 +1,5 @@
-﻿import json
+import json
+import re
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, FeatureNotFound
@@ -75,45 +76,75 @@ class PlayerProfileScraper:
                 return text
         return None
 
-    @staticmethod
-    def _extract_labeled_values(soup: BeautifulSoup) -> dict[str, str]:
+    @classmethod
+    def _extract_labeled_values(cls, soup: BeautifulSoup) -> dict[str, str]:
         values: dict[str, str] = {}
 
+        # Classic table format.
         for row in soup.select("table tr"):
             header = row.find("th")
             value = row.find("td")
             if header and value:
-                key = header.get_text(" ", strip=True).lower()
+                key = cls._normalize_key(header.get_text(" ", strip=True))
                 val = value.get_text(" ", strip=True)
                 if key and val:
                     values[key] = val
 
-        dt_nodes = soup.select("dt")
-        for dt in dt_nodes:
+        # Definition list format.
+        for dt in soup.select("dt"):
             dd = dt.find_next_sibling("dd")
             if not dd:
                 continue
-            key = dt.get_text(" ", strip=True).lower()
+            key = cls._normalize_key(dt.get_text(" ", strip=True))
             val = dd.get_text(" ", strip=True)
             if key and val and key not in values:
                 values[key] = val
 
+        # Legacy list format with explicit label/value classes.
         for item in soup.select("li"):
             label = item.select_one(".label")
             value = item.select_one(".value")
             if not label or not value:
                 continue
-            key = label.get_text(" ", strip=True).lower().rstrip(":")
+            key = cls._normalize_key(label.get_text(" ", strip=True))
             val = value.get_text(" ", strip=True)
             if key and val and key not in values:
                 values[key] = val
 
+        # Transfermarkt data-header format.
+        for item in soup.select("li.data-header__label"):
+            content = item.select_one(".data-header__content")
+            if not content:
+                continue
+            key_parts = [frag.strip() for frag in item.find_all(string=True, recursive=False) if frag.strip()]
+            key = cls._normalize_key(" ".join(key_parts))
+            val = content.get_text(" ", strip=True)
+            if key and val and key not in values:
+                values[key] = val
+
+        # Transfermarkt info-table format: alternating label/value spans.
+        info_nodes = soup.select(".info-table .info-table__content")
+        if len(info_nodes) >= 2:
+            for i in range(0, len(info_nodes) - 1, 2):
+                key = cls._normalize_key(info_nodes[i].get_text(" ", strip=True))
+                val = info_nodes[i + 1].get_text(" ", strip=True)
+                if key and val and key not in values:
+                    values[key] = val
+
         return values
+
+    @staticmethod
+    def _normalize_key(raw_key: str) -> str:
+        key = raw_key.strip().lower()
+        key = key.split(":", 1)[0].strip()
+        key = re.sub(r"\s+", " ", key)
+        key = key.strip("/ ")
+        return key
 
     @staticmethod
     def _find_label_value(labels: dict[str, str], aliases: list[str]) -> str | None:
         for alias in aliases:
-            key = alias.lower()
+            key = alias.strip().lower()
             if key in labels:
                 return labels[key]
         return None

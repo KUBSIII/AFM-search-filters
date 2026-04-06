@@ -1,4 +1,4 @@
-﻿from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass
 import logging
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -6,6 +6,7 @@ from app.normalizers.player_normalizer import PlayerNormalizer
 from app.repositories.player_repository import PlayerRepository
 from app.scrapers.club_players_scraper import ClubPlayersScraper
 from app.scrapers.player_profile_scraper import PlayerProfileScraper
+from app.scrapers.player_search_scraper import PlayerSearchScraper
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +37,20 @@ class PlayerSyncService:
         session_factory: sessionmaker[Session],
         profile_scraper: PlayerProfileScraper,
         club_scraper: ClubPlayersScraper,
+        search_scraper: PlayerSearchScraper,
         normalizer: PlayerNormalizer,
     ):
         self.session_factory = session_factory
         self.profile_scraper = profile_scraper
         self.club_scraper = club_scraper
+        self.search_scraper = search_scraper
         self.normalizer = normalizer
 
     def fetch_club_player_ids(self, club_id: str) -> list[str]:
         return self.club_scraper.fetch_club_player_ids(club_id)
+
+    def fetch_player_ids_by_name(self, name: str, limit: int = 5) -> list[str]:
+        return self.search_scraper.fetch_player_ids_by_name(name, limit=limit)
 
     def sync_player(self, transfermarkt_id: str) -> SyncItemResult:
         transfermarkt_id = str(transfermarkt_id)
