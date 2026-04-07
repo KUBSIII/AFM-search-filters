@@ -11,6 +11,7 @@ from app.scrapers.club_players_scraper import ClubPlayersScraper
 from app.scrapers.http_client import TransfermarktHttpClient
 from app.scrapers.player_profile_scraper import PlayerProfileScraper
 from app.scrapers.player_search_scraper import PlayerSearchScraper
+from app.scrapers.player_stats_scraper import PlayerStatsScraper
 from app.services.player_sync_service import PlayerSyncService
 
 router = APIRouter(tags=["sync"])
@@ -34,6 +35,7 @@ def get_player_sync_service() -> PlayerSyncService:
         profile_scraper=PlayerProfileScraper(client),
         club_scraper=ClubPlayersScraper(client),
         search_scraper=PlayerSearchScraper(client),
+        stats_scraper=PlayerStatsScraper(client),
         normalizer=PlayerNormalizer(),
     )
 

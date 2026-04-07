@@ -5,6 +5,7 @@ from app.scrapers.club_players_scraper import ClubPlayersScraper
 from app.scrapers.http_client import TransfermarktHttpClient
 from app.scrapers.player_profile_scraper import PlayerProfileScraper
 from app.scrapers.player_search_scraper import PlayerSearchScraper
+from app.scrapers.player_stats_scraper import PlayerStatsScraper
 
 
 def _read_fixture(name: str) -> str:
@@ -87,3 +88,25 @@ def test_parse_player_search_results() -> None:
     ids = scraper.parse_player_ids_from_search(_read_fixture("player_search_results.html"), limit=2)
 
     assert ids == ["28003", "68290"]
+
+
+def test_parse_stats_by_club_extracts_total_from_tfoot() -> None:
+    scraper = PlayerStatsScraper(http_client=TransfermarktHttpClient(5, 0, 0, 100))
+    club_apps = scraper.parse_club_apps(_read_fixture("player_stats_by_club.html"))
+
+    assert club_apps == 478
+
+
+def test_parse_stats_by_club_sums_tbody_when_no_tfoot() -> None:
+    scraper = PlayerStatsScraper(http_client=TransfermarktHttpClient(5, 0, 0, 100))
+    club_apps = scraper.parse_club_apps(_read_fixture("player_stats_no_footer.html"))
+
+    assert club_apps == 144
+
+
+def test_parse_stats_by_club_returns_none_for_empty_html() -> None:
+    scraper = PlayerStatsScraper(http_client=TransfermarktHttpClient(5, 0, 0, 100))
+    club_apps = scraper.parse_club_apps("<html><body></body></html>")
+
+    assert club_apps is None
+

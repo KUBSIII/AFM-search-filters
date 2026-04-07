@@ -36,11 +36,20 @@ class FakeSearchScraper:
         return self.result_ids[:limit]
 
 
+class FakeStatsScraper:
+    def __init__(self, apps: dict[str, int | None] | None = None):
+        self.apps = apps or {}
+
+    def fetch_club_apps(self, transfermarkt_id: str) -> int | None:
+        return self.apps.get(transfermarkt_id)
+
+
 def _build_service(
     tmp_path: Path,
     payloads: dict[str, dict[str, str | None] | Exception],
     club_ids: list[str],
     search_ids: list[str] | None = None,
+    stats_apps: dict[str, int | None] | None = None,
 ) -> tuple[PlayerSyncService, sessionmaker[Session]]:
     db_path = tmp_path / "service_sync_test.db"
     engine = create_engine(f"sqlite+pysqlite:///{db_path}", future=True)
@@ -59,6 +68,7 @@ def _build_service(
         profile_scraper=FakeProfileScraper(payloads),
         club_scraper=FakeClubScraper(club_ids),
         search_scraper=FakeSearchScraper(search_ids or []),
+        stats_scraper=FakeStatsScraper(stats_apps or {}),
         normalizer=PlayerNormalizer(),
     )
 
